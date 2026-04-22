@@ -30,15 +30,16 @@ bool ESP::WorldToScreen(const Vector3& worldPos, Vector2& screenPos, const Matri
 }
 
 void ESP::DrawSkeleton(KernelInterface& kernel, ULONG pid, uint64_t pCSPlayerPawn, const Matrix4x4& viewMatrix, int screenWidth, int screenHeight) {
-    // Build 14151: m_pGameSceneNode = 0x330 (was 0x328)
-    uint64_t gameSceneNode = kernel.ReadMemory<uint64_t>(pid, pCSPlayerPawn + 0x330);
+    // Dynamic offsets from Offsets.hpp (updated by cs2-dumper)
+    uint64_t gameSceneNode = kernel.ReadMemory<uint64_t>(pid, pCSPlayerPawn + offsets::m_pGameSceneNode);
     if (!gameSceneNode) return;
 
-    // m_modelState = 0x150, bone array at m_modelState + 0x80 = 0x1D0
-    uint64_t boneArray = kernel.ReadMemory<uint64_t>(pid, gameSceneNode + 0x1D0);
+    // Bone array is typically at m_modelState + 0x80 (0x1D0 total) or 0x1F8 in some builds
+    uint64_t boneArray = kernel.ReadMemory<uint64_t>(pid, gameSceneNode + offsets::m_modelState + 0x80);
     if (!boneArray || boneArray < 0x1000000) {
-        boneArray = kernel.ReadMemory<uint64_t>(pid, gameSceneNode + 0x1F8);
+        boneArray = kernel.ReadMemory<uint64_t>(pid, gameSceneNode + offsets::m_modelState + 0xA8); // Fallback to 0x1F8
     }
+
     if (!boneArray || boneArray < 0x1000000) return;
 
     ImDrawList* drawList = ImGui::GetBackgroundDrawList();

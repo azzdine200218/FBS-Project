@@ -70,8 +70,8 @@ public:
             ULONGLONG controller = kernel->ReadMemory<ULONGLONG>(pid, chunkBase + (ULONGLONG)(ENTITY_LIST_ENTRY_STRIDE * (i & 0x1FF)));
             if (!controller) continue;
 
-            // Use m_hPawn (0x6BC) from CBasePlayerController - correct for build 14151
-            ULONG pawnHandle = kernel->ReadMemory<ULONG>(pid, controller + 0x6BC);
+            // Use m_hPawn from CBasePlayerController
+            ULONG pawnHandle = kernel->ReadMemory<ULONG>(pid, controller + offsets::m_hPawn);
             if (!pawnHandle || pawnHandle == 0xFFFFFFFF) continue;
 
             int pawnIndex = pawnHandle & 0x7FFF;
@@ -91,17 +91,18 @@ public:
             int armor = kernel->ReadMemory<int>(pid, pawn + cs2_dumper::schemas::client_dll::C_CSPlayerPawn::m_ArmorValue);
             uint64_t moneyServices = kernel->ReadMemory<uint64_t>(pid, controller + cs2_dumper::schemas::client_dll::CCSPlayerController::m_pInGameMoneyServices);
             // Build 14151: m_pGameSceneNode = 0x330 (was 0x328)
-            uint64_t gameSceneNode = kernel->ReadMemory<uint64_t>(pid, pawn + 0x330);
+            uint64_t gameSceneNode = kernel->ReadMemory<uint64_t>(pid, pawn + offsets::m_pGameSceneNode);
 
             char playerName[128] = {};
             kernel->ReadMemoryBlock(pid, controller + cs2_dumper::schemas::client_dll::CBasePlayerController::m_iszPlayerName, playerName, 127);
 
             uint64_t boneArray = 0;
             if (gameSceneNode && gameSceneNode > 0x1000000) {
-                // Build 14151: m_modelState = 0x150, bone array at +0x80 = 0x1D0
-                boneArray = kernel->ReadMemory<uint64_t>(pid, gameSceneNode + 0x1D0);
+                // Try primary bone array offset
+                boneArray = kernel->ReadMemory<uint64_t>(pid, gameSceneNode + offsets::m_modelState + 0x80);
                 if (!boneArray || boneArray < 0x1000000) {
-                    boneArray = kernel->ReadMemory<uint64_t>(pid, gameSceneNode + 0x1F8);
+                    // Fallback for some CS2 builds
+                    boneArray = kernel->ReadMemory<uint64_t>(pid, gameSceneNode + offsets::m_modelState + 0xA8);
                 }
             }
 

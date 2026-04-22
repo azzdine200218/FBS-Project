@@ -13,4 +13,9 @@ namespace offsets {
     using namespace cs2_dumper::offsets::client_dll;
     using namespace cs2_dumper::schemas::client_dll;
     using namespace cs2_dumper::buttons;
+
+    // Common Schema Offsets for easier access
+    constexpr std::ptrdiff_t m_pGameSceneNode = cs2_dumper::schemas::client_dll::C_BaseEntity::m_pGameSceneNode;
+    constexpr std::ptrdiff_t m_modelState = cs2_dumper::schemas::client_dll::CGameSceneNode::m_modelState;
+    constexpr std::ptrdiff_t m_hPawn = cs2_dumper::schemas::client_dll::CBasePlayerController::m_hPawn;
 }
