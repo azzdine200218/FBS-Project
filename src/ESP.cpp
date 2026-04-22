@@ -55,6 +55,12 @@ void ESP::DrawSkeleton(KernelInterface& kernel, ULONG pid, uint64_t pCSPlayerPaw
         Vector3 bone1Pos = *(Vector3*)(boneData + connection.bone1 * 32);
         Vector3 bone2Pos = *(Vector3*)(boneData + connection.bone2 * 32);
 
+        // Skip drawing if bone positions are (0,0,0) - fixes lines stretching to map origin due to LOD
+        if ((bone1Pos.x == 0.0f && bone1Pos.y == 0.0f && bone1Pos.z == 0.0f) ||
+            (bone2Pos.x == 0.0f && bone2Pos.y == 0.0f && bone2Pos.z == 0.0f)) {
+            continue;
+        }
+
         Vector2 screenPos1, screenPos2;
         if (WorldToScreen(bone1Pos, screenPos1, viewMatrix, screenWidth, screenHeight) &&
             WorldToScreen(bone2Pos, screenPos2, viewMatrix, screenWidth, screenHeight)) {

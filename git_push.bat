@@ -8,6 +8,9 @@ git add .
 echo Committing...
 git commit -m "%msg%"
 
+echo Syncing with remote (Pulling)...
+git pull origin main --no-rebase
+
 echo Pushing to GitHub...
 git push origin main
 
