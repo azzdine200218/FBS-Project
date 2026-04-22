@@ -5,7 +5,8 @@
 #include "../include/Offsets.hpp"
 #include "ESP.hpp"
 
-constexpr std::ptrdiff_t ENTITY_STRIDE = 0x70; // Build 14151: CEntityIdentity stride
+// تم التصحيح: المسافة الصحيحة للكيانات في CS2 هي 120 بايت (0x78)
+constexpr std::ptrdiff_t ENTITY_STRIDE = 0x78; 
 
 namespace Triggerbot {
 
@@ -21,6 +22,7 @@ void Execute(KernelInterface& kernel, ULONG pid, uint64_t clientBase, uint64_t l
     uint64_t listEntry = kernel.ReadMemory<uint64_t>(pid, entityList + 0x8 * ((crosshairId & 0x7FFF) >> 9) + 16);
     if (!listEntry) return;
 
+    // الآن سيتمكن من قراءة بيانات اللاعب المستهدف بشكل صحيح
     uint64_t targetPawn = kernel.ReadMemory<uint64_t>(pid, listEntry + ENTITY_STRIDE * (crosshairId & 0x1FF));
     if (!targetPawn || targetPawn == localPlayerPawn) return;
 
@@ -55,16 +57,16 @@ void Execute(KernelInterface& kernel, ULONG pid, uint64_t clientBase, uint64_t l
                         float ndc_dist = std::sqrt(_x * _x + _y * _y);
                         
                         if (ndc_dist > 0.05f) {
-                            return; // Aim deviates too much from the head
+                            return; // الهدف بعيد عن الرأس
                         }
                     } else {
-                        return; // Behind camera
+                        return; 
                     }
                 } else {
-                    return; // Bone array failed
+                    return; 
                 }
             } else {
-                return; // Scene Node failed
+                return; 
             }
         }
         // ---------------------------
@@ -73,8 +75,8 @@ void Execute(KernelInterface& kernel, ULONG pid, uint64_t clientBase, uint64_t l
             std::this_thread::sleep_for(std::chrono::milliseconds(menu.triggerbotDelay));
         }
 
-        kernel.LeftClick();
-        std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Reset delay
+        kernel.LeftClick(); // محاكاة الضغط
+        std::this_thread::sleep_for(std::chrono::milliseconds(100)); 
     }
 }
 
