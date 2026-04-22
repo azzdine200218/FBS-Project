@@ -55,10 +55,20 @@ void ESP::DrawSkeleton(KernelInterface& kernel, ULONG pid, uint64_t pCSPlayerPaw
         Vector3 bone1Pos = *(Vector3*)(boneData + connection.bone1 * 32);
         Vector3 bone2Pos = *(Vector3*)(boneData + connection.bone2 * 32);
 
-        // Skip drawing if bone positions are (0,0,0) - fixes lines stretching to map origin due to LOD
-        if ((bone1Pos.x == 0.0f && bone1Pos.y == 0.0f && bone1Pos.z == 0.0f) ||
-            (bone2Pos.x == 0.0f && bone2Pos.y == 0.0f && bone2Pos.z == 0.0f)) {
+        // 1. Zero check (using epsilon for precision) to avoid drawing to map origin
+        if ((std::abs(bone1Pos.x) < 0.01f && std::abs(bone1Pos.y) < 0.01f) ||
+            (std::abs(bone2Pos.x) < 0.01f && std::abs(bone2Pos.y) < 0.01f)) {
             continue;
+        }
+
+        // 2. Distance check: connected bones cannot be too far apart (max 45 units in Source)
+        float dx = bone1Pos.x - bone2Pos.x;
+        float dy = bone1Pos.y - bone2Pos.y;
+        float dz = bone1Pos.z - bone2Pos.z;
+        float distance = std::sqrt(dx*dx + dy*dy + dz*dz);
+        
+        if (distance > 45.0f) {
+            continue; 
         }
 
         Vector2 screenPos1, screenPos2;
