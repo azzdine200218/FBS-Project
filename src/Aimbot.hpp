@@ -49,6 +49,10 @@ namespace Aimbot {
         Vector3 viewAngles = kernel.ReadMemory<Vector3>(pid,
             clientBase + cs2_dumper::offsets::client_dll::dwViewAngles);
 
+        // Read weapon recoil (Aim Punch) for compensation
+        const uint64_t m_aimPunchAngle = 0x14F4; 
+        Vector3 aimPunch = kernel.ReadMemory<Vector3>(pid, localPawn + m_aimPunchAngle);
+
         int localTeam = kernel.ReadMemory<uint8_t>(pid,
             localPawn + cs2_dumper::schemas::client_dll::C_BaseEntity::m_iTeamNum);
 
@@ -85,6 +89,10 @@ namespace Aimbot {
 
             Vector3 aimAngle;
             CalculateAngles(localEye, targetPos, aimAngle);
+
+            // Recoil Compensation: Subtract punch * 2.0 because Source engine doubles visual recoil
+            aimAngle.x -= aimPunch.x * 2.0f;
+            aimAngle.y -= aimPunch.y * 2.0f;
             float fov = GetFov(viewAngles, aimAngle);
 
             if (fov < bestFov) {
