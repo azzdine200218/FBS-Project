@@ -41,53 +41,37 @@ namespace Aimbot {
         angles.z = 0.0f;
     }
 
-    static Vector3 aimbotPreviousPunch = {0, 0, 0};
-
     static bool Execute(KernelInterface& kernel, ULONG pid, uint64_t clientBase,
                         uint64_t localPawn, EntityManager& entMgr, const Menu& menu) {
         
-        if (!menu.aimbotEnabled || !localPawn) {
-            aimbotPreviousPunch = {0, 0, 0};
-            return false;
-        }
+        if (!menu.aimbotEnabled || !localPawn) return false;
 
-        if ((GetAsyncKeyState(VK_LBUTTON) & 0x8000) == 0) {
-            aimbotPreviousPunch = {0, 0, 0};
-            return false;
-        }
-
-        // قراءة الارتداد باستخدام الأوفست الديناميكي الصحيح
-        uint64_t m_aimPunchAngle = cs2_dumper::schemas::client_dll::C_CSPlayerPawn::m_aimPunchAngle; 
-        Vector3 currentPunch = kernel.ReadMemory<Vector3>(pid, localPawn + m_aimPunchAngle);
+        if ((GetAsyncKeyState(VK_LBUTTON) & 0x8000) == 0) return false;
 
         Vector3 viewAngles = kernel.ReadMemory<Vector3>(pid, clientBase + cs2_dumper::offsets::client_dll::dwViewAngles);
+        
+        // قراءة الارتداد وعدد الرصاصات المطلقة
+        Vector3 currentPunch = kernel.ReadMemory<Vector3>(pid, localPawn + cs2_dumper::schemas::client_dll::C_CSPlayerPawn::m_aimPunchAngle);
+        int32_t shotsFired = kernel.ReadMemory<int32_t>(pid, localPawn + cs2_dumper::schemas::client_dll::C_CSPlayerPawn::m_iShotsFired);
 
-        // 1. تطبيق التعويض اللحظي (Instant RCS) أولاً
-        Vector3 punchDelta = {
-            currentPunch.x - aimbotPreviousPunch.x,
-            currentPunch.y - aimbotPreviousPunch.y,
-            0.0f
-        };
-        aimbotPreviousPunch = currentPunch;
-
-        viewAngles.x -= punchDelta.x * 2.0f;
-        viewAngles.y -= punchDelta.y * 2.0f;
-        ClampAngles(viewAngles);
-
-        // 2. حساب موقع مؤشر السلاح الفعلي (Crosshair) للبحث عن الأهداف
-        Vector3 crosshair = {
-            viewAngles.x + currentPunch.x * 2.0f,
-            viewAngles.y + currentPunch.y * 2.0f,
-            0.0f
-        };
+        // تصفير الارتداد إذا لم نكن نطلق النار لتجنب الاهتزازات الوهمية
+        if (shotsFired == 0) currentPunch = {0, 0, 0};
 
         Vector3 localOrigin = kernel.ReadMemory<Vector3>(pid, localPawn + cs2_dumper::schemas::client_dll::C_BasePlayerPawn::m_vOldOrigin);
-        Vector3 localEye = { localOrigin.x, localOrigin.y, localOrigin.z + 64.0f };
+        // إضافة 64.0f للوصول إلى مستوى العين تقريباً
+        Vector3 localEye = { localOrigin.x, localOrigin.y, localOrigin.z + 64.0f }; 
         int localTeam = kernel.ReadMemory<uint8_t>(pid, localPawn + cs2_dumper::schemas::client_dll::C_BaseEntity::m_iTeamNum);
 
         float    bestFov   = (float)menu.aimbotFov;
         Vector3  bestAngle = {0.0f, 0.0f, 0.0f};
         bool     hasTarget = false;
+
+        // حساب الـ Crosshair الفعلي المتأثر بالارتداد لاكتشاف الأهداف داخل الدائرة بشكل صحيح
+        Vector3 crosshair = {
+            viewAngles.x + currentPunch.x * 2.0f,
+            viewAngles.y + currentPunch.y * 2.0f,
+            0.0f
+        };
 
         for (const auto& player : entMgr.GetPlayers()) {
             if (!player.pawn || player.pawn == localPawn) continue;
@@ -120,22 +104,32 @@ namespace Aimbot {
             }
         }
 
-        // 3. التوجه بنعومة نحو الهدف (إن وُجد)
         if (hasTarget) {
-            float smooth = menu.aimbotSmoothness < 1.0f ? 1.0f : menu.aimbotSmoothness;
+            // الخوارزمية الجديدة: خصم الارتداد مباشرة من زاوية الهدف بدلاً من خصمه من الكاميرا
+            bestAngle.x -= currentPunch.x * 2.0f;
+            bestAngle.y -= currentPunch.y * 2.0f;
+            ClampAngles(bestAngle);
 
-            float dx = bestAngle.x - crosshair.x;
-            float dy = bestAngle.y - crosshair.y;
-            
+            // حساب المسافة الكلية بين زاوية الرؤية الحالية والزاوية الجديدة المطلوبة
+            float dx = bestAngle.x - viewAngles.x;
+            float dy = bestAngle.y - viewAngles.y;
+
+            // تصحيح المسار ليكون عبر أقصر زاوية ممكنة (Shortest Path)
             while (dy >  180.0f) dy -= 360.0f;
             while (dy < -180.0f) dy += 360.0f;
+            while (dx >   89.0f) dx -= 180.0f;
+            while (dx <  -89.0f) dx += 180.0f;
 
+            float smooth = menu.aimbotSmoothness < 1.0f ? 1.0f : menu.aimbotSmoothness;
+
+            // التحرك بنعومة نحو الهدف المعوض بالارتداد
             viewAngles.x += dx / smooth;
             viewAngles.y += dy / smooth;
             ClampAngles(viewAngles);
+
+            kernel.WriteMemory<Vector3>(pid, clientBase + cs2_dumper::offsets::client_dll::dwViewAngles, viewAngles);
         }
 
-        kernel.WriteMemory<Vector3>(pid, clientBase + cs2_dumper::offsets::client_dll::dwViewAngles, viewAngles);
         return true; 
     }
 }

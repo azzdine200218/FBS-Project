@@ -19,15 +19,14 @@ namespace RCS {
             return;
         }
 
-        // التحقق من ضغط زر الماوس الأيسر
-        if ((GetAsyncKeyState(VK_LBUTTON) & 0x8000) == 0) {
-            previousPunch = {0, 0, 0};
-            return;
-        }
+        int32_t shotsFired = kernel.ReadMemory<int32_t>(pid, localPawn + cs2_dumper::schemas::client_dll::C_CSPlayerPawn::m_iShotsFired);
+        Vector3 currentPunch = {0, 0, 0};
 
-        // استخدام الـ Offset الديناميكي من الـ Dumper بدلاً من رقم ثابت
-        uint64_t m_aimPunchAngle = cs2_dumper::schemas::client_dll::C_CSPlayerPawn::m_aimPunchAngle;
-        Vector3 currentPunch = kernel.ReadMemory<Vector3>(pid, localPawn + m_aimPunchAngle);
+        // نقرأ الارتداد الفعلي فقط في حال إطلاق أكثر من رصاصة (لتجنب الاهتزاز مع النقرات الفردية)
+        // وإذا توقفنا عن الإطلاق، سيصبح currentPunch أصفاراً مما يؤدي لإرجاع الماوس لمكانه الطبيعي بنعومة.
+        if (shotsFired > 1) {
+            currentPunch = kernel.ReadMemory<Vector3>(pid, localPawn + cs2_dumper::schemas::client_dll::C_CSPlayerPawn::m_aimPunchAngle);
+        }
 
         Vector3 delta = {
             currentPunch.x - previousPunch.x,
@@ -38,7 +37,7 @@ namespace RCS {
         previousPunch = currentPunch;
 
         if (delta.x == 0.0f && delta.y == 0.0f) {
-            return;
+            return; // لا يوجد تغير في الارتداد، لذا لا نكتب على الذاكرة لتخفيف الضغط
         }
 
         Vector3 viewAngles = kernel.ReadMemory<Vector3>(pid, clientBase + cs2_dumper::offsets::client_dll::dwViewAngles);
@@ -46,7 +45,7 @@ namespace RCS {
         viewAngles.x -= delta.x * config.vertical * 2.0f;
         viewAngles.y -= delta.y * config.horizontal * 2.0f;
 
-        // حماية الزوايا من التلف (Untrusted Clamp)
+        // حماية الزوايا (Untrusted Clamp)
         if (std::isnan(viewAngles.x) || std::isnan(viewAngles.y)) return;
         if (viewAngles.x > 89.0f) viewAngles.x = 89.0f;
         if (viewAngles.x < -89.0f) viewAngles.x = -89.0f;
