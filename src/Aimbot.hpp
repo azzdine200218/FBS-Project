@@ -35,13 +35,21 @@ namespace Aimbot {
         return sqrtf(dx * dx + dy * dy);
     }
 
-    // Returns true if aimbot is actively writing angles (so RCS skips its write that frame)
+    // أضف هذا المتغير خارج الدالة لحفظ الارتداد السابق وتطبيق التعويض اللحظي
+    static Vector3 aimbotPreviousPunch = {0, 0, 0};
+
     static bool Execute(KernelInterface& kernel, ULONG pid, uint64_t clientBase,
                         uint64_t localPawn, EntityManager& entMgr, const Menu& menu) {
-        if (!menu.aimbotEnabled || !localPawn) return false;
-        if ((GetAsyncKeyState(VK_LBUTTON) & 0x8000) == 0) return false;
+        // تصفير الارتداد المحفوظ عند إيقاف التفعيل لتجنب القفزات العشوائية
+        if (!menu.aimbotEnabled || !localPawn) {
+            aimbotPreviousPunch = {0, 0, 0};
+            return false;
+        }
+        if ((GetAsyncKeyState(VK_LBUTTON) & 0x8000) == 0) {
+            aimbotPreviousPunch = {0, 0, 0};
+            return false;
+        }
 
-        // Local eye position: origin + 64 unit standing eye height
         Vector3 localOrigin = kernel.ReadMemory<Vector3>(pid,
             localPawn + cs2_dumper::schemas::client_dll::C_BasePlayerPawn::m_vOldOrigin);
         Vector3 localEye = { localOrigin.x, localOrigin.y, localOrigin.z + 64.0f };
@@ -49,12 +57,37 @@ namespace Aimbot {
         Vector3 viewAngles = kernel.ReadMemory<Vector3>(pid,
             clientBase + cs2_dumper::offsets::client_dll::dwViewAngles);
 
-        // Read weapon recoil (Aim Punch) for compensation
         const uint64_t m_aimPunchAngle = 0x14F4; 
         Vector3 aimPunch = kernel.ReadMemory<Vector3>(pid, localPawn + m_aimPunchAngle);
 
         int localTeam = kernel.ReadMemory<uint8_t>(pid,
             localPawn + cs2_dumper::schemas::client_dll::C_BaseEntity::m_iTeamNum);
+
+        // 1. التعويض اللحظي للارتداد (Instant RCS) بدون Smooth
+        Vector3 punchDelta = {
+            aimPunch.x - aimbotPreviousPunch.x,
+            aimPunch.y - aimbotPreviousPunch.y,
+            0.0f
+        };
+        aimbotPreviousPunch = aimPunch; // تحديث الارتداد القديم
+
+        // تطبيق التعويض على زاوية الرؤية مباشرة (مثل ملف RCS.hpp)
+        viewAngles.x -= punchDelta.x * 2.0f;
+        viewAngles.y -= punchDelta.y * 2.0f;
+
+        // تصحيح الزوايا لعدم الخروج عن النطاق المسموح
+        if (viewAngles.x > 89.0f) viewAngles.x = 89.0f;
+        if (viewAngles.x < -89.0f) viewAngles.x = -89.0f;
+        while (viewAngles.y > 180.0f) viewAngles.y -= 360.0f;
+        while (viewAngles.y < -180.0f) viewAngles.y += 360.0f;
+
+        // 2. حساب موقع مؤشر التصويب الفعلي (Crosshair) بعد الارتداد
+        // هذا مهم جداً لحساب الـ FOV وحساب مسافة السحب بشكل صحيح
+        Vector3 crosshairAngles = {
+            viewAngles.x + aimPunch.x * 2.0f,
+            viewAngles.y + aimPunch.y * 2.0f,
+            0.0f
+        };
 
         float    bestFov   = (float)menu.aimbotFov;
         Vector3  bestAngle = {0.0f, 0.0f, 0.0f};
@@ -69,13 +102,11 @@ namespace Aimbot {
             bool useBackup = true;
 
             if (player.boneArray && player.boneArray >= 0x1000000) {
-                // Use real bone positions for accurate pitch (Z axis matters!)
                 int boneId = Bones::Head;
                 if      (menu.aimbotBone == 1) boneId = Bones::Spine;
                 else if (menu.aimbotBone == 2) boneId = Bones::Pelvis;
 
                 targetPos = kernel.ReadMemory<Vector3>(pid, player.boneArray + boneId * 32);
-                // Sanity check – bone must be non-zero
                 if (targetPos.x != 0.0f || targetPos.y != 0.0f || targetPos.z != 0.0f)
                     useBackup = false;
             }
@@ -90,25 +121,29 @@ namespace Aimbot {
             Vector3 aimAngle;
             CalculateAngles(localEye, targetPos, aimAngle);
 
-            // Recoil Compensation: Subtract punch * 2.0 because Source engine doubles visual recoil
-            aimAngle.x -= aimPunch.x * 2.0f;
-            aimAngle.y -= aimPunch.y * 2.0f;
-            float fov = GetFov(viewAngles, aimAngle);
+            // حساب الـ FOV بناءً على موقع السلاح الفعلي (Crosshair) وليس منتصف الشاشة
+            float fov = GetFov(crosshairAngles, aimAngle);
 
             if (fov < bestFov) {
                 bestFov   = fov;
-                bestAngle = aimAngle;
+                bestAngle = aimAngle; // نحفظ زاوية الهدف الصافية
                 hasTarget = true;
             }
         }
 
-        if (!hasTarget) return false;
+        // إذا لم نجد هدفاً في الشاشة، نقوم بكتابة الارتداد اللحظي (يعمل كأنه RCS عادي)
+        if (!hasTarget) {
+            kernel.WriteMemory<Vector3>(pid, clientBase + cs2_dumper::offsets::client_dll::dwViewAngles, viewAngles);
+            return true; 
+        }
 
         float smooth = menu.aimbotSmoothness;
         if (smooth < 1.0f) smooth = 1.0f;
 
-        float dx = bestAngle.x - viewAngles.x;
-        float dy = bestAngle.y - viewAngles.y;
+        // 3. نحسب المسافة بين هدفنا وبين موقع السلاح الحالي، ونطبق النعومة (Smooth) عليها فقط
+        float dx = bestAngle.x - crosshairAngles.x;
+        float dy = bestAngle.y - crosshairAngles.y;
+        
         while (dy >  180.0f) dy -= 360.0f;
         while (dy < -180.0f) dy += 360.0f;
 
@@ -123,9 +158,8 @@ namespace Aimbot {
         while (finalAngles.y >  180.0f) finalAngles.y -= 360.0f;
         while (finalAngles.y < -180.0f) finalAngles.y += 360.0f;
 
-        kernel.WriteMemory<Vector3>(pid,
-            clientBase + cs2_dumper::offsets::client_dll::dwViewAngles, finalAngles);
+        kernel.WriteMemory<Vector3>(pid, clientBase + cs2_dumper::offsets::client_dll::dwViewAngles, finalAngles);
 
-        return true; // Prevent RCS from overwriting angles this frame
+        return true; 
     }
 }
