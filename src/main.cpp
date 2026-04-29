@@ -10,6 +10,7 @@
 #include "../include/XorStr.hpp"
 #include "../include/EntityManager.hpp"
 #include "../include/RCS.hpp"
+#include "../include/Stealth.hpp"
 #include "Overlay.hpp"
 #include "Menu.hpp"
 #include "ESP.hpp"
@@ -24,9 +25,13 @@
 using namespace offsets;
 
 int main() {
+    if (Stealth::RunAllChecks()) {
+        return 1;
+    }
+
     KernelInterface kernel;
     if (!kernel.IsConnected()) {
-        system(XOR_STR("pause"));
+        system(XOR_STR("pause").c_str());
         return 1;
     }
 
@@ -40,7 +45,7 @@ int main() {
 
     Overlay overlay;
     if (!overlay.Initialize()) {
-        system(XOR_STR("pause"));
+        system(XOR_STR("pause").c_str());
         return 1;
     }
 
@@ -278,9 +283,9 @@ int main() {
                     ULONGLONG entity = kernel.ReadMemory<ULONGLONG>(pid, chunkBase + (ULONGLONG)(ENTITY_LIST_ENTRY_STRIDE * (i & 0x1FF)));
                     if (!entity) continue;
 
-                    uint64_t entityIdentity = kernel.ReadMemory<uint64_t>(pid, entity + 0x10);
+                    uint64_t entityIdentity = kernel.ReadMemory<uint64_t>(pid, entity + cs2_dumper::schemas::client_dll::CEntityInstance::m_pEntity);
                     if (!entityIdentity) continue;
-                    uint64_t designerNamePtr = kernel.ReadMemory<uint64_t>(pid, entityIdentity + 0x20);
+                    uint64_t designerNamePtr = kernel.ReadMemory<uint64_t>(pid, entityIdentity + cs2_dumper::schemas::client_dll::CEntityIdentity::m_designerName);
                     if (designerNamePtr < 0x10000 || designerNamePtr > 0x7FFFFFFFFFFF) continue;
 
                     char nameBuf[32] = {};
@@ -323,9 +328,9 @@ int main() {
                     ULONGLONG activeWeapon = kernel.ReadMemory<ULONGLONG>(pid, weaponChunk + (ULONGLONG)(ENTITY_LIST_ENTRY_STRIDE * (activeWeaponHandle & 0x1FF)));
                     if (!activeWeapon) continue;
 
-                    uint64_t weaponIdentity = kernel.ReadMemory<uint64_t>(pid, activeWeapon + 0x10);
+                    uint64_t weaponIdentity = kernel.ReadMemory<uint64_t>(pid, activeWeapon + cs2_dumper::schemas::client_dll::CEntityInstance::m_pEntity);
                     if (!weaponIdentity) continue;
-                    uint64_t weaponNamePtr = kernel.ReadMemory<uint64_t>(pid, weaponIdentity + 0x20);
+                    uint64_t weaponNamePtr = kernel.ReadMemory<uint64_t>(pid, weaponIdentity + cs2_dumper::schemas::client_dll::CEntityIdentity::m_designerName);
                     if (weaponNamePtr < 0x10000 || weaponNamePtr > 0x7FFFFFFFFFFF) continue;
 
                     char wNameBuf[32] = {};

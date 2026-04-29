@@ -31,12 +31,20 @@ private:
         file << name << " = " << value << "\n";
     }
     
+    void WriteFloat(std::ofstream& file, const std::string& name, float value) {
+        file << name << " = " << value << "\n";
+    }
+    
     bool ParseBool(const std::string& value) {
         return value == "true" || value == "1";
     }
     
     int ParseInt(const std::string& value) {
         try { return std::stoi(value); } catch (...) { return 0; }
+    }
+    
+    float ParseFloat(const std::string& value) {
+        try { return std::stof(value); } catch (...) { return 0.0f; }
     }
     
 public:
@@ -80,6 +88,16 @@ public:
         WriteBool(file, "triggerbotEnabled", menu->triggerbotEnabled);
         WriteInt(file, "triggerbotDelay", menu->triggerbotDelay);
         WriteBool(file, "triggerbotHeadshotOnly", menu->triggerbotHeadshotOnly);
+        
+        WriteBool(file, "aimbotEnabled", menu->aimbotEnabled);
+        WriteInt(file, "aimbotFov", menu->aimbotFov);
+        WriteFloat(file, "aimbotSmoothness", menu->aimbotSmoothness);
+        WriteInt(file, "aimbotBone", menu->aimbotBone);
+        WriteBool(file, "aimbotTargetTeammates", menu->aimbotTargetTeammates);
+        
+        WriteBool(file, "rcsEnabled", menu->rcsEnabled);
+        WriteFloat(file, "rcsHorizontal", menu->rcsHorizontal);
+        WriteFloat(file, "rcsVertical", menu->rcsVertical);
         
         WriteBool(file, "bhopEnabled", menu->bhopEnabled);
         WriteBool(file, "bhopStrafeAssist", menu->bhopStrafeAssist);
@@ -128,6 +146,16 @@ public:
             else if (key == "triggerbotEnabled") menu->triggerbotEnabled = ParseBool(value);
             else if (key == "triggerbotDelay") menu->triggerbotDelay = ParseInt(value);
             else if (key == "triggerbotHeadshotOnly") menu->triggerbotHeadshotOnly = ParseBool(value);
+            
+            else if (key == "aimbotEnabled") menu->aimbotEnabled = ParseBool(value);
+            else if (key == "aimbotFov") menu->aimbotFov = ParseInt(value);
+            else if (key == "aimbotSmoothness") menu->aimbotSmoothness = ParseFloat(value);
+            else if (key == "aimbotBone") menu->aimbotBone = ParseInt(value);
+            else if (key == "aimbotTargetTeammates") menu->aimbotTargetTeammates = ParseBool(value);
+            
+            else if (key == "rcsEnabled") menu->rcsEnabled = ParseBool(value);
+            else if (key == "rcsHorizontal") menu->rcsHorizontal = ParseFloat(value);
+            else if (key == "rcsVertical") menu->rcsVertical = ParseFloat(value);
             
             else if (key == "bhopEnabled") menu->bhopEnabled = ParseBool(value);
             else if (key == "bhopStrafeAssist") menu->bhopStrafeAssist = ParseBool(value);

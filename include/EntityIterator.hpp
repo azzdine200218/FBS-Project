@@ -101,10 +101,10 @@ public:
         uint32_t ownerHandle = kernel->ReadMemory<uint32_t>(pid, entity + cs2_dumper::schemas::client_dll::C_BaseEntity::m_hOwnerEntity);
         if (ownerHandle != 0xFFFFFFFF) return info;
 
-        uint64_t entityIdentity = kernel->ReadMemory<uint64_t>(pid, entity + 0x10);
+        uint64_t entityIdentity = kernel->ReadMemory<uint64_t>(pid, entity + cs2_dumper::schemas::client_dll::CEntityInstance::m_pEntity);
         if (!entityIdentity) return info;
 
-        uint64_t designerNamePtr = kernel->ReadMemory<uint64_t>(pid, entityIdentity + 0x20);
+        uint64_t designerNamePtr = kernel->ReadMemory<uint64_t>(pid, entityIdentity + cs2_dumper::schemas::client_dll::CEntityIdentity::m_designerName);
         if (designerNamePtr < 0x10000 || designerNamePtr > 0x7FFFFFFFFFFF) return info;
 
         char nameBuf[32] = {};
@@ -115,10 +115,10 @@ public:
         std::string wName = GetWeaponNameFromDesigner(designerName);
         if (wName.empty()) return info;
 
-        uint64_t sceneNode = kernel->ReadMemory<uint64_t>(pid, entity + 0x338);
+        uint64_t sceneNode = kernel->ReadMemory<uint64_t>(pid, entity + cs2_dumper::schemas::client_dll::C_BaseEntity::m_pGameSceneNode);
         Vector3 origin;
         if (sceneNode) {
-            origin = kernel->ReadMemory<Vector3>(pid, sceneNode + 0xD0);
+            origin = kernel->ReadMemory<Vector3>(pid, sceneNode + cs2_dumper::schemas::client_dll::CGameSceneNode::m_vecAbsOrigin);
         } else {
             origin = kernel->ReadMemory<Vector3>(pid, entity + cs2_dumper::schemas::client_dll::C_BasePlayerPawn::m_vOldOrigin);
         }
@@ -141,10 +141,10 @@ public:
             ULONGLONG entity = kernel->ReadMemory<ULONGLONG>(pid, chunkBase + (ULONGLONG)(112 * (i & 0x1FF)));
             if (!entity) continue;
 
-            uint64_t entityIdentity = kernel->ReadMemory<uint64_t>(pid, entity + 0x10);
+            uint64_t entityIdentity = kernel->ReadMemory<uint64_t>(pid, entity + cs2_dumper::schemas::client_dll::CEntityInstance::m_pEntity);
             if (!entityIdentity) continue;
 
-            uint64_t designerNamePtr = kernel->ReadMemory<uint64_t>(pid, entityIdentity + 0x20);
+            uint64_t designerNamePtr = kernel->ReadMemory<uint64_t>(pid, entityIdentity + cs2_dumper::schemas::client_dll::CEntityIdentity::m_designerName);
             if (designerNamePtr < 0x10000 || designerNamePtr > 0x7FFFFFFFFFFF) continue;
 
             char nameBuf[32] = {};
@@ -155,9 +155,9 @@ public:
                 info.entity = entity;
                 info.isPlanted = (name.find("planted") != std::string::npos);
 
-                uint64_t sceneNode = kernel->ReadMemory<uint64_t>(pid, entity + 0x338);
+                uint64_t sceneNode = kernel->ReadMemory<uint64_t>(pid, entity + cs2_dumper::schemas::client_dll::C_BaseEntity::m_pGameSceneNode);
                 if (sceneNode) {
-                    info.origin = kernel->ReadMemory<Vector3>(pid, sceneNode + 0xD0);
+                    info.origin = kernel->ReadMemory<Vector3>(pid, sceneNode + cs2_dumper::schemas::client_dll::CGameSceneNode::m_vecAbsOrigin);
                 } else {
                     info.origin = kernel->ReadMemory<Vector3>(pid, entity + cs2_dumper::schemas::client_dll::C_BasePlayerPawn::m_vOldOrigin);
                 }
