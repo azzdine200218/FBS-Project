@@ -46,4 +46,10 @@ public:
     static void DrawC4Timer(float x, float y, float timeRemaining, ImColor color);
     static void DrawGrenadeTrajectory(KernelInterface& kernel, ULONG pid, uint64_t grenadePawn, const Matrix4x4& viewMatrix, int screenWidth, int screenHeight);
     static void DrawVisibleCheck(float x, float y, bool isVisible);
+
+    static ImColor GetHealthColor(int health);
+    static ImColor GetDistanceColor(float distance);
+    static void DrawGlowBox(float x, float y, float w, float h, ImColor color, float glowRadius = 4.0f);
+    static void DrawGradientHealthBar(float x, float y, float h, int health);
+    static void DrawInfoBadge(float x, float y, const char* text, ImColor bgColor, ImColor textColor);
 };
