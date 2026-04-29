@@ -5,7 +5,7 @@ KernelInterface::KernelInterface(const char* registryPath) : sharedMem(nullptr) 
     UNREFERENCED_PARAMETER(registryPath);
     
     hDriver = CreateFileA(
-        XOR_STR("\\\\.\\NUL"),
+        XOR_STR("\\\\.\\NUL").c_str(),
         GENERIC_READ | GENERIC_WRITE,
         0,
         nullptr,
