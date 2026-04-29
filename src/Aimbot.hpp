@@ -36,7 +36,7 @@ namespace Aimbot {
     }
 
     static float GetFov(const Vector3& viewAngles, const Vector3& targetAngles) {
-        float dx = NormalizePitch(targetAngles.x - viewAngles.x);
+        float dx = targetAngles.x - viewAngles.x;
         float dy = NormalizeYaw(targetAngles.y - viewAngles.y);
         return sqrtf(dx * dx + dy * dy);
     }
@@ -162,7 +162,7 @@ namespace Aimbot {
         bestAngle.y -= currentPunch.y * 2.0f;
         ClampAngles(bestAngle);
 
-        float dx = NormalizePitch(bestAngle.x - viewAngles.x);
+        float dx = bestAngle.x - viewAngles.x;
         float dy = NormalizeYaw(bestAngle.y - viewAngles.y);
 
         float smooth = GetAdaptiveSmooth(menu.aimbotSmoothness, best.fov, best.distance);
